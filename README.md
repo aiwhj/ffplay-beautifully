@@ -18,7 +18,7 @@ sudo apt-get install libsdl2-dev libavformat-dev libavcodec-dev libavutil-dev li
 其他说明：<br>
 该工程的生成步骤：<br>
 从官方下载到ffmpeg后主要需要进行如下修改：<br>
-1. 要运行./configure 来生成config.h(需要先sudo apt install yasm)
-2. 把ffmpeg工程中的文件按本工程参考，复制相应的文件到一个新文件夹中
-3. 代码改动很少，主要是把ffplay.c中的#include <SDL.h>改为#include <SDL2/SDL.h>，把#include <SDL_thread.h>改为#include <SDL2/SDL_thread.h>，注释掉cmdutils.c中的#include "libavutil/libm.h"和#include "libavformat/network.h"
-4. 把本工程中的Makefile添加进来
+1. 要运行./configure 来生成config.h(需要先sudo apt install yasm)<br>
+2. 把ffmpeg工程中的文件按本工程参考，复制相应的文件到一个新文件夹中<br>
+3. 代码改动很少，主要是把ffplay.c中的#include <SDL.h>改为#include <SDL2/SDL.h>，把#include <SDL_thread.h>改为#include <SDL2/SDL_thread.h>，注释掉cmdutils.c中的#include "libavutil/libm.h"和#include "libavformat/network.h"<br>
+4. 把本工程中的Makefile添加进来<br>

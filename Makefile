@@ -3,4 +3,3 @@ ffplay:ffplay.c cmdutils.c
 
 clean:
 	rm ffplay
-

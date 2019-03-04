@@ -18,7 +18,8 @@
  * License along with FFmpeg; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
  */
-
+extern "C"
+{
 #include <string.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -28,7 +29,6 @@
 /* Include only the enabled headers since some compilers (namely, Sun
    Studio) will not omit unused inline functions and create undefined
    references to libraries that are not being built. */
-
 #include "config.h"
 #include "compat/va_copy.h"
 #include "libavformat/avformat.h"
@@ -53,7 +53,6 @@
 #include "libavutil/cpu.h"
 #include "libavutil/ffversion.h"
 #include "libavutil/version.h"
-#include "cmdutils.h"
 #if CONFIG_NETWORK
 //#include "libavformat/network.h"
 #endif
@@ -64,7 +63,8 @@
 #ifdef _WIN32
 #include <windows.h>
 #endif
-
+#include "cmdutils.hpp"
+};
 static int init_report(const char *env);
 
 AVDictionary *sws_dict;
@@ -196,15 +196,15 @@ void show_help_options(const OptionDef *options, const char *msg, int req_flags,
     printf("\n");
 }
 
-void show_help_children(const AVClass *class, int flags)
+void show_help_children(const AVClass *class_c, int flags)
 {
     const AVClass *child = NULL;
-    if (class->option) {
-        av_opt_show2(&class, NULL, flags, 0);
+    if (class_c->option) {
+        av_opt_show2(&class_c, NULL, flags, 0);
         printf("\n");
     }
 
-    while (child = av_opt_child_class_next(class, child))
+    while (child = av_opt_child_class_next(class_c, child))
         show_help_children(child, flags);
 }
 
@@ -296,12 +296,12 @@ static int write_option(void *optctx, const OptionDef *po, const char *opt,
     int *dstcount;
 
     if (po->flags & OPT_SPEC) {
-        SpecifierOpt **so = dst;
-        char *p = strchr(opt, ':');
+        SpecifierOpt **so = (SpecifierOpt **)dst;
+        char *p = (char *)strchr(opt, ':');
         char *str;
 
         dstcount = (int *)(so + 1);
-        *so = grow_array(*so, sizeof(**so), dstcount, *dstcount + 1);
+        *so = (SpecifierOpt *)grow_array(*so, sizeof(**so), dstcount, *dstcount + 1);
         str = av_strdup(p ? p + 1 : "");
         if (!str)
             return AVERROR(ENOMEM);
@@ -468,7 +468,7 @@ static void dump_argument(const char *a)
 {
     const unsigned char *p;
 
-    for (p = a; *p; p++)
+    for (p = (const unsigned char *)a; *p; p++)
         if (!((*p >= '+' && *p <= ':') || (*p >= '@' && *p <= 'Z') ||
               *p == '_' || (*p >= 'a' && *p <= 'z')))
             break;
@@ -477,7 +477,7 @@ static void dump_argument(const char *a)
         return;
     }
     fputc('"', report_file);
-    for (p = a; *p; p++) {
+    for (p = (const unsigned char *)a; *p; p++) {
         if (*p == '\\' || *p == '"' || *p == '$' || *p == '`')
             fprintf(report_file, "\\%c", *p);
         else if (*p < ' ' || *p > '~')
@@ -659,7 +659,8 @@ static void finish_group(OptionParseContext *octx, int group_idx,
     OptionGroupList *l = &octx->groups[group_idx];
     OptionGroup *g;
 
-    GROW_ARRAY(l->groups, l->nb_groups);
+    // GROW_ARRAY(l->groups, l->nb_groups);
+    grow_array(l->groups, sizeof(*l->groups), &l->nb_groups, l->nb_groups + 1);
     g = &l->groups[l->nb_groups - 1];
 
     *g             = octx->cur_group;
@@ -690,7 +691,8 @@ static void add_opt(OptionParseContext *octx, const OptionDef *opt,
     int global = !(opt->flags & (OPT_PERFILE | OPT_SPEC | OPT_OFFSET));
     OptionGroup *g = global ? &octx->global_opts : &octx->cur_group;
 
-    GROW_ARRAY(g->opts, g->nb_opts);
+    // GROW_ARRAY(g->opts, g->nb_opts);
+    grow_array(g->opts, sizeof(*g->opts), &g->nb_opts, g->nb_opts + 1);
     g->opts[g->nb_opts - 1].opt = opt;
     g->opts[g->nb_opts - 1].key = key;
     g->opts[g->nb_opts - 1].val = val;
@@ -705,7 +707,7 @@ static void init_parse_context(OptionParseContext *octx,
     memset(octx, 0, sizeof(*octx));
 
     octx->nb_groups = nb_groups;
-    octx->groups    = av_mallocz_array(octx->nb_groups, sizeof(*octx->groups));
+    octx->groups    = (OptionGroupList *)av_mallocz_array(octx->nb_groups, sizeof(*octx->groups));
     if (!octx->groups)
         exit_program(1);
 
@@ -881,7 +883,7 @@ int opt_loglevel(void *optctx, const char *opt, const char *arg)
     int i;
 
     flags = av_log_get_flags();
-    tail = strstr(arg, "repeat");
+    tail = (char *)strstr(arg, "repeat");
     if (tail)
         flags &= ~AV_LOG_SKIP_REPEATED;
     else
@@ -912,14 +914,14 @@ int opt_loglevel(void *optctx, const char *opt, const char *arg)
     return 0;
 }
 
-static void expand_filename_template(AVBPrint *bp, const char *template,
+static void expand_filename_template(AVBPrint *bp, const char *template_c,
                                      struct tm *tm)
 {
     int c;
 
-    while ((c = *(template++))) {
+    while ((c = *(template_c++))) {
         if (c == '%') {
-            if (!(c = *(template++)))
+            if (!(c = *(template_c++)))
                 break;
             switch (c) {
             case 'p':
@@ -985,7 +987,7 @@ static int init_report(const char *env)
 
     av_bprint_init(&filename, 0, 1);
     expand_filename_template(&filename,
-                             av_x_if_null(filename_template, "%p-%t.log"), tm);
+                             (const char *)av_x_if_null(filename_template, "%p-%t.log"), tm);
     av_free(filename_template);
     if (!av_bprint_is_complete(&filename)) {
         av_log(NULL, AV_LOG_ERROR, "Out of memory building report file name\n");
@@ -1432,8 +1434,8 @@ static const AVCodec *next_codec_for_id(enum AVCodecID id, const AVCodec *prev,
 
 static int compare_codec_desc(const void *a, const void *b)
 {
-    const AVCodecDescriptor * const *da = a;
-    const AVCodecDescriptor * const *db = b;
+    const AVCodecDescriptor * const *da = (const AVCodecDescriptor *const *)a;
+    const AVCodecDescriptor * const *db = (const AVCodecDescriptor *const *)b;
 
     return (*da)->type != (*db)->type ? FFDIFFSIGN((*da)->type, (*db)->type) :
            strcmp((*da)->name, (*db)->name);
@@ -1447,7 +1449,7 @@ static unsigned get_codecs_sorted(const AVCodecDescriptor ***rcodecs)
 
     while ((desc = avcodec_descriptor_next(desc)))
         nb_codecs++;
-    if (!(codecs = av_calloc(nb_codecs, sizeof(*codecs)))) {
+    if (!(codecs = (const AVCodecDescriptor **)av_calloc(nb_codecs, sizeof(*codecs)))) {
         av_log(NULL, AV_LOG_ERROR, "Out of memory\n");
         exit_program(1);
     }
@@ -1731,7 +1733,7 @@ int show_sample_fmts(void *optctx, const char *opt, const char *arg)
     int i;
     char fmt_str[128];
     for (i = -1; i < AV_SAMPLE_FMT_NB; i++)
-        printf("%s\n", av_get_sample_fmt_string(fmt_str, sizeof(fmt_str), i));
+        printf("%s\n", av_get_sample_fmt_string(fmt_str, sizeof(fmt_str), (AVSampleFormat)i));
     return 0;
 }
 
@@ -2045,7 +2047,7 @@ AVDictionary **setup_find_stream_info_opts(AVFormatContext *s,
 
     if (!s->nb_streams)
         return NULL;
-    opts = av_mallocz_array(s->nb_streams, sizeof(*opts));
+    opts = (AVDictionary **)av_mallocz_array(s->nb_streams, sizeof(*opts));
     if (!opts) {
         av_log(NULL, AV_LOG_ERROR,
                "Could not alloc memory for stream options.\n");
@@ -2064,7 +2066,7 @@ void *grow_array(void *array, int elem_size, int *size, int new_size)
         exit_program(1);
     }
     if (*size < new_size) {
-        uint8_t *tmp = av_realloc_array(array, new_size, elem_size);
+        uint8_t *tmp = (uint8_t *)av_realloc_array(array, new_size, elem_size);
         if (!tmp) {
             av_log(NULL, AV_LOG_ERROR, "Could not alloc buffer.\n");
             exit_program(1);

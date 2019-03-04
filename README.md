@@ -1,3 +1,22 @@
+# ffplay-美颜测试版
+想实现 实时磨皮美颜，看小姐姐用
+
+添加 cmake 编译。
+
+使用 opencv 的双边滤波算法，实现 bilateralFilter 方法进行视频播放实时磨皮美颜，添加了简单的缓冲方法，但是性能太差。。。1080P 太卡。。。正在寻求解决方法
+
+## build
+依赖 SDL2，FFmpeg，opencv
+
+先编辑 CMakeLists.txt 改类库路径
+```
+mkdir build
+cd build
+cmake ..
+make
+```
+================
+# 以下为源版说明
 # ffplay-3.2.4
 单独编译 ffplay-3.2.4(Ubuntu17.04)<br>
 <br>
